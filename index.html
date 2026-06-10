@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INTEresting City Injector</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f7f5;--surface:#fff;--border:rgba(0,0,0,.1);--border-s:rgba(0,0,0,.22);
+  --text:#1a1a1a;--muted:#6b6b6b;--faint:#aaa;
+  --accent:#378ADD;--accent-d:#185FA5;--accent-l:#e6f1fb;
+  --ok:#3b6d11;--ok-bg:#eaf3de;--err:#a32d2d;--err-bg:#fcebeb;
+  --warn-bg:#fffbeb;--warn-border:#f0c040;--warn-text:#7a5500;
+  --mono:'Courier New',Courier,monospace;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1c;--surface:#262626;--border:rgba(255,255,255,.1);--border-s:rgba(255,255,255,.22);
+  --text:#efefef;--muted:#aaa;--faint:#555;
+  --accent:#5ba3e8;--accent-d:#85b7eb;--accent-l:#0c2540;
+  --ok:#7ab93a;--ok-bg:#1a2e0a;--err:#e07070;--err-bg:#2e0a0a;
+  --warn-bg:#2a2000;--warn-border:#9a7a00;--warn-text:#f0c040;
+}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:3rem 1rem 0}
+.wrap{width:100%;max-width:660px;display:flex;flex-direction:column;gap:1.1rem}
+.hdr{display:flex;align-items:flex-start;gap:12px}
+.hdr-icon{width:42px;height:42px;border-radius:10px;background:var(--accent-l);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+h1{font-size:19px;font-weight:600;line-height:1.3}
+.sub{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.6}
+.tag{display:inline-block;background:var(--accent-l);color:var(--accent-d);font-size:11px;
+  padding:1px 5px;border-radius:4px;font-family:var(--mono);margin:0 1px}
+.card{background:var(--surface);border:.5px solid var(--border);border-radius:10px;padding:1.1rem 1.3rem}
+.card-title{font-size:12px;font-weight:500;color:var(--muted);margin-bottom:10px;
+  text-transform:uppercase;letter-spacing:.05em}
+.zone{border:1.5px dashed var(--border-s);border-radius:10px;padding:2.2rem 1.5rem;
+  display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;
+  background:var(--surface);transition:background .15s,border-color .15s;outline:none}
+.zone:hover,.zone.over{background:var(--accent-l);border-color:var(--accent)}
+.zone svg{color:var(--faint)}
+.drop-lbl{font-size:15px;color:var(--muted)}.drop-lbl span{color:var(--accent)}
+.drop-hint{font-size:12px;color:var(--faint)}
+.prog-track{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin:10px 0 4px}
+.prog-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s ease;width:0%}
+.status{font-size:13px;color:var(--muted);min-height:18px}
+.stats{display:flex;gap:10px;margin:10px 0}
+.stat{flex:1;background:var(--bg);border:.5px solid var(--border);border-radius:8px;padding:9px 10px;text-align:center}
+.stat-n{font-size:21px;font-weight:500}.stat-n.acc{color:var(--accent)}
+.stat-l{font-size:11px;color:var(--muted);margin-top:2px}
+.log-list{margin-top:10px;max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.log-row{display:flex;align-items:baseline;flex-wrap:wrap;font-family:var(--mono);font-size:12px;
+  line-height:1.7;border-radius:5px;padding:1px 6px}
+.log-row.ok{color:var(--ok)}.log-row.warn{color:var(--warn-text)}
+.log-row.skip{color:var(--faint)}.log-row.manual{color:var(--accent)}
+.log-icon{width:14px;flex-shrink:0}
+.log-ref{color:var(--faint);margin:0 6px 0 2px;font-size:11px}
+.log-city{font-weight:500}
+.log-note{color:var(--faint);font-size:11px;margin-left:4px}
+.log-toggle{cursor:pointer;background:none;border:none;padding:0;font-family:var(--mono);
+  font-size:11px;color:var(--accent);margin-left:6px;text-decoration:underline dotted;line-height:inherit}
+.log-toggle:hover{color:var(--accent-d)}
+.log-detail{display:none;font-size:11px;color:var(--faint);padding:2px 6px 4px 30px;
+  line-height:1.6;white-space:pre-wrap;font-family:var(--mono);width:100%}
+.log-detail.open{display:block}
+.btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;
+  font-size:14px;cursor:pointer;border:.5px solid var(--border-s);transition:background .12s}
+.btn-p{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
+.btn-p:hover{background:var(--accent-d)}
+.btn-s{background:transparent;color:var(--text)}.btn-s:hover{background:var(--bg)}
+.err-box{display:flex;gap:8px;align-items:flex-start;background:var(--err-bg);
+  border:.5px solid #f09595;border-radius:8px;padding:10px 13px;font-size:13px;color:var(--err)}
+.review-intro{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+.review-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;padding-right:2px}
+.review-item{background:var(--bg);border:.5px solid var(--border);border-radius:8px;
+  padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.review-addr{font-family:var(--mono);font-size:11px;color:var(--faint);line-height:1.6}
+.review-addr span{display:block}
+.review-row{display:flex;gap:8px;align-items:center}
+.review-label{font-size:12px;color:var(--muted);white-space:nowrap}
+.review-input{flex:1;padding:6px 9px;border-radius:6px;border:.5px solid var(--border-s);
+  background:var(--surface);color:var(--text);font-size:13px;outline:none;transition:border-color .15s}
+.review-input:focus{border-color:var(--accent)}
+.review-input::placeholder{color:var(--faint)}
+.warn-banner{background:var(--warn-bg);border:.5px solid var(--warn-border);border-radius:8px;
+  padding:10px 13px;font-size:13px;color:var(--warn-text);display:flex;gap:8px;
+  align-items:flex-start;margin-bottom:12px}
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{display:flex;align-items:flex-start;gap:10px}
+.step-n{width:22px;height:22px;border-radius:50%;background:var(--accent-l);color:var(--accent);
+  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-t{font-size:13px;color:var(--muted);line-height:1.6}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="hdr-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>
+      </svg>
+    </div>
+    <div>
+      <h1>INTEresting City Injector</h1>
+      <p class="sub">Reads each <span class="tag">0016</span> address, extracts the city automatically, and inserts a <span class="tag">0006</span> line between <span class="tag">0009</span> and <span class="tag">0016</span>. No API key needed — all processing happens locally in your browser.</p>
+    </div>
+  </div>
+
+  <div id="zone" class="zone" tabindex="0" role="button" aria-label="Upload .txt file"
+       onclick="document.getElementById('fi').click()"
+       ondragover="dov(event)" ondragleave="dol()" ondrop="ddr(event)"
+       onkeydown="if(event.key==='Enter'||event.key===' ')document.getElementById('fi').click()">
+    <input id="fi" type="file" accept=".txt" style="display:none" onchange="onFI(event)">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+      <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+    </svg>
+    <p class="drop-lbl">Drop your .txt file here, or <span>click to browse</span></p>
+    <p class="drop-hint">Any file size — all processing is local, no data leaves your browser</p>
+  </div>
+
+  <div id="err-box" class="err-box hidden">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span id="err-msg"></span>
+  </div>
+
+  <div id="proc-card" class="card hidden">
+    <p class="status" id="proc-lbl" style="margin-bottom:2px">Processing…</p>
+    <div class="prog-track"><div class="prog-fill" id="prog"></div></div>
+    <p class="status" id="status-msg"></p>
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="s-tot">0</div><div class="stat-l">Total records</div></div>
+      <div class="stat"><div class="stat-n" id="s-don">0</div><div class="stat-l">Processed</div></div>
+      <div class="stat"><div class="stat-n" id="s-skp">0</div><div class="stat-l">Unclear city</div></div>
+    </div>
+    <div class="log-list" id="proc-log"></div>
+  </div>
+
+  <div id="review-card" class="card hidden">
+    <div class="card-title">Review unclear cities</div>
+    <div class="warn-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span id="review-banner-text"></span>
+    </div>
+    <p class="review-intro">Type a city for each record below, or leave blank to skip. You can also click <em>Skip all</em> to proceed immediately.</p>
+    <div class="review-list" id="review-list"></div>
+    <div class="btn-row">
+      <button class="btn btn-p" onclick="applyReview()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Apply &amp; build file
+      </button>
+      <button class="btn btn-s" onclick="skipAllReview()">Skip all</button>
+    </div>
+  </div>
+
+  <div id="done-card" class="card hidden">
+    <div style="display:flex;align-items:center;gap:8px;color:var(--ok);font-weight:500;font-size:15px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      Ready to download
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-top:6px" id="done-sum"></p>
+    <div class="stats" style="margin-top:12px">
+      <div class="stat"><div class="stat-n" id="d-tot">0</div><div class="stat-l">Total records</div></div>
+      <div class="stat"><div class="stat-n acc" id="d-inj">0</div><div class="stat-l">Cities injected</div></div>
+      <div class="stat"><div class="stat-n" id="d-skp">0</div><div class="stat-l">Skipped</div></div>
+    </div>
+    <div class="log-list" id="done-log"></div>
+    <div id="skipped-fill" class="hidden" style="margin-top:14px">
+      <div class="card-title">Fill in skipped cities (optional)</div>
+      <p class="review-intro">These records had no city extracted. Enter a city to include a <span class="tag">0006</span> line, or leave blank. Click <em>Apply</em> to regenerate the file.</p>
+      <div class="review-list" id="skipped-list"></div>
+      <div class="btn-row">
+        <button class="btn btn-p" onclick="applySkipped()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Apply
+        </button>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-p" onclick="dlFile()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Save As…
+      </button>
+      <button class="btn btn-s" onclick="reset()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+        </svg>
+        Process another file
+      </button>
+    </div>
+  </div>
+
+  <div id="howto" class="card">
+    <div class="card-title">How it works</div>
+    <div class="steps">
+      <div class="step"><div class="step-n">1</div><p class="step-t">Upload any .txt publication unit file. Records are grouped by <span class="tag">8005</span> / <span class="tag">9010</span> markers.</p></div>
+      <div class="step"><div class="step-n">2</div><p class="step-t">Each <span class="tag">0016</span> address is parsed locally — covers European, American (full state names), Canadian (full province names), NZ, Japanese, Korean, Chinese, Middle Eastern and other formats.</p></div>
+      <div class="step"><div class="step-n">3</div><p class="step-t">If any cities couldn't be extracted automatically, a review step lets you fill them in manually — or skip and fill after seeing the results.</p></div>
+      <div class="step"><div class="step-n">4</div><p class="step-t">A <span class="tag">0006 : City</span> line is inserted after <span class="tag">0009</span> and before <span class="tag">0016</span>. <span class="tag">³</span> characters, latin-1 encoding, and everything else stay untouched.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function dov(e){e.preventDefault();document.getElementById('zone').classList.add('over');}
+function dol(){document.getElementById('zone').classList.remove('over');}
+function ddr(e){e.preventDefault();dol();const f=e.dataTransfer.files[0];if(f)go(f);}
+function onFI(e){const f=e.target.files[0];if(f)go(f);e.target.value='';}
+
+function readL1(buf){return Array.from(new Uint8Array(buf)).map(b=>String.fromCharCode(b)).join('');}
+function encL1(s){const b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i)&0xff;return b;}
+
+function parseRecs(raw){
+  const lines=raw.split('\n'),hdr=[],recs=[];
+  let cur=null;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i];
+    if(l.startsWith('8005 : ***** NEW PUBLICATION UNIT *****')){
+      if(cur)recs.push(cur);
+      cur={lines:[l],has16:false,addr16:'',country18:'',code05:'',ref89:'',i9:-1,i16:-1};
+    } else if(cur){
+      cur.lines.push(l);
+      const r=cur.lines.length-1;
+      if(l.startsWith('0009 : '))cur.i9=r;
+      if(l.startsWith('0016 : ')){cur.i16=r;cur.has16=true;cur.addr16=l.substring(7);}
+      if(l.startsWith('0018 : '))cur.country18=l.substring(7).trim();
+      if(l.startsWith('0005 : '))cur.code05=l.substring(7).trim();
+      if(l.startsWith('0089 : '))cur.ref89=l.substring(7).trim();
+    } else hdr.push(l);
+  }
+  if(cur)recs.push(cur);
+  return{hdr,recs};
+}
+
+// ── City extraction ────────────────────────────────────────────────────────────
+function extractCity(addr16,country18,code05){
+  const isLux=/luxembourg/i.test(country18)||(code05||'').trim().toUpperCase()==='LUXE';
+  if(isLux)return 'Luxembourg';
+  const parts=addr16.split('\xb3').map(s=>s.trim()).filter(Boolean);
+  if(!parts.length)return null;
+  const result=cityFromParts(parts);
+  // Never return a digits-only string as a city
+  if(result&&/^\d+$/.test(result.trim()))return null;
+  return result;
+}
+
+function stc(s){return s.trim().replace(/,+$/,'').trim();}
+function tcase(s){
+  s=s.trim();
+  if(s!==s.toUpperCase())return s;
+  return s.toLowerCase().replace(/(?:^|\s|-)[a-z\u00e0-\u00ff]/g,c=>c.toUpperCase());
+}
+function clean(s){return tcase(stc(s));}
+function stripP(s){return s.replace(/\s*\([^)]*\)/g,'').trim();}
+
+const PROV=new Set([
+  'ontario','british columbia','alberta','quebec','nova scotia','new brunswick',
+  'prince edward island','newfoundland','manitoba','saskatchewan',
+  'alabama','alaska','arizona','arkansas','california','colorado','connecticut',
+  'delaware','florida','georgia','hawaii','idaho','illinois','indiana','iowa',
+  'kansas','kentucky','louisiana','maine','maryland','massachusetts','michigan',
+  'minnesota','mississippi','missouri','montana','nebraska','nevada',
+  'new hampshire','new jersey','new mexico','new york','north carolina',
+  'north dakota','ohio','oklahoma','oregon','pennsylvania','rhode island',
+  'south carolina','south dakota','tennessee','texas','utah','vermont',
+  'virginia','washington','west virginia','wisconsin','wyoming',
+  'new south wales','victoria','queensland','western australia','south australia',
+  'tasmania','northern territory',
+  'gangwon-do','selangor','guangxi','jiangsu','anhui','zhejiang',
+  'sichuan','hebei','liaoning','tatarstan',
+  // Indian states & union territories
+  'andhra pradesh','arunachal pradesh','assam','bihar','chhattisgarh',
+  'goa','gujarat','haryana','himachal pradesh','jharkhand','karnataka','kerala',
+  'madhya pradesh','maharashtra','manipur','meghalaya','mizoram','nagaland','odisha',
+  'punjab','rajasthan','sikkim','tamil nadu','telangana','tripura','uttar pradesh',
+  'uttarakhand','west bengal','delhi','jammu and kashmir','ladakh'
+]);
+
+const RX={
+  uk:       /\b[A-Z]{1,2}\d[\dA-Z]?\s*\d[A-Z]{2}\b/,
+  nl:       /(?:[A-Z]{1,3}-)?\d{4}\s+([A-Z]{2})\s+(.+)/,
+  euPfx:    /^([A-Z]{1,3})-[\d][\d\s-]{2,7}\s+(.+)/,
+  plain:    /^\d[\d\s-]{3,8}\s+([A-Z\u00c0-\u00dd].+)/i,
+  usca:     /^(.+?),?\s+([A-Z]{2,3})\s+[A-Z]?\d[\w\s-]{3,10}$/,
+  caFull:   /^(.+?)\s+(ONTARIO|BRITISH COLUMBIA|ALBERTA|QUEBEC|NOVA SCOTIA|NEW BRUNSWICK|PRINCE EDWARD ISLAND|NEWFOUNDLAND|MANITOBA|SASKATCHEWAN)\s+[A-Z]\d[A-Z]\s*\d[A-Z]\d\s*$/i,
+  caAlpha:  /[A-Z]\d[A-Z]\s*\d[A-Z]\d$/,
+  cityZip:  /^([A-Z][A-Za-z\s]+?)\s+(\d{3,6})\s*$/i,
+  revCity:  /^\d[\d\s-]{2,7}\s+([A-Z][A-Za-z\s]+?)\s*$/i,
+  pcCity:   /^[A-Z]{2,4}\s+\d{3,5}\s+([A-Z][A-Za-z\s]+?)\s*$/i,
+  irish:    /^[A-Z]\d{2}\s+\w{4}$/,
+  irishFull:/^([A-Za-z][A-Za-z\s]*?)\s+[A-Z]\d{2}\s+\w{4}$/i,
+  cityZone: /^([A-Z][A-Za-z\s]+?)\s+(\d{1,2})\s*$/i,
+  sing:     /^SINGAPORE\s*\d+/i,
+  jpShi:    /,?\s*([^,\d\s][^,\d]*?)-[Ss][Hh][Ii]\b/,
+  jpCity:   /^([A-Za-z][A-Za-z\s]+?)\s+\d{3}-\d{4}$/,
+  krSi:     /([A-Za-z][A-Za-z\s]+?)-si\b/i,
+  chinC:    /([A-Za-z][A-Za-z\s]+?)\s+City\b/i,
+  region:   /\b(?:Region|Province|Oblast|Raion|Republic|State|County|Shire|Cambridgeshire|Gangwon|Selangor|Gujarat|Maharashtra|Tatarstan)\b/i,
+  uaCity:   /\bm\.\s+([A-Z\u00c0-\u00dd][^,\d]+?)(?:,|\s+\d|$)/i,
+  cityPc:   /^([A-Z\u00c0-\u00dd][A-Za-z\u00c0-\u00ff\s-]+?),\s*\d+\s*$/,
+  street:   /\b(?:street|avenue|road|boulevard|drive|lane|way|court|str\.|rue|via|calle|ul\.|stra[sß]e|suite|floor|building|bldg|blvd|ave\.?|rd\.?|alley|highway|hwy|expressway|chome|mah\.|mahallesi|cad\.|cadde|route)\b/i,
+  skip:     /(?:suite|floor|#|apt|unit|building|bldg|ste\.?|avenue|street|road|boulevard|drive|way|lane|industrial|park|center|centre|market|campus|garden|research|block|wing|tower)\b/i,
+  county:   /(?:shire|borough|wick|sex|folk|land|set)$/i,
+  skipFst:  /^(?:c\/o|care\s+of|zac\s|attn|attention|p\.?o\.?\s*box)/i,
+  csz:      /^(.*?[A-Za-z])\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+\d{4,6}\s*$/,
+  ccsz:     /^([^,]+),\s*([^,\d]+?)\s+\d{4,6}\s*$/,
+};
+
+function isStreet(s){return RX.street.test(s);}
+function isProv(s){return PROV.has(s.trim().toLowerCase())||RX.region.test(s);}
+function hasDigit(s){return /\d/.test(s);}
+function isRD(s){return /^RD\s*\d/i.test(s.trim());}
+
+function cityFromParts(parts){
+  for(const p of parts)if(/ho\s+chi\s+minh\s+city/i.test(p))return 'Ho Chi Minh City';
+  for(const p of parts)if(RX.sing.test(p))return 'Singapore';
+
+  const last=parts[parts.length-1],prev=parts.length>=2?parts[parts.length-2]:'',first=parts[0];
+
+  // Ukrainian m. City
+  for(const p of parts){const m=p.match(RX.uaCity);if(m)return clean(m[1]);}
+  // City, postcode
+  {const m=last.match(RX.cityPc);if(m)return clean(m[1]);}
+  // Last is pure province → prev
+  if(isProv(last)&&!hasDigit(last)){
+    const mc=prev.match(RX.chinC);if(mc)return clean(mc[1]);
+    if(prev&&!hasDigit(prev)&&!isProv(prev)){
+      // Extract last clean comma-token from prev rather than full string
+      const toks=prev.split(',').map(s=>s.trim()).filter(Boolean);
+      for(let i=toks.length-1;i>=0;i--){
+        const t=toks[i];
+        if(t&&!isStreet(t)&&t.length>1&&t.length<40)return tcase(t);
+      }
+    }
+  }
+  // First segment = city (no digits, no street, has postcode at end)
+  if(parts.length>=2&&!hasDigit(first)&&!isStreet(first)&&!RX.skipFst.test(first)
+      &&first.indexOf(',')===-1&&first.length<40&&hasDigit(last)&&!isProv(first)&&!isRD(first))
+    return clean(first);
+
+  // UK postcode (with or without space: W1G7HH or W1G 7HH)
+  {const m=last.match(RX.uk);
+    if(m){
+      const before=last.slice(0,m.index).trim().replace(/,+$/,'').trim();
+      if(before){
+        const cp=before.split(',').map(s=>s.trim()).filter(Boolean);
+        let city=cp[cp.length-1];
+        if(RX.county.test(city)&&cp.length>1)city=cp[0];
+        const words=city.split(/\s+/);
+        if(words.length>=2&&RX.county.test(words[words.length-1]))city=words.slice(0,-1).join(' ');
+        return tcase(city.trim());
+      }
+      if(prev&&!hasDigit(prev)&&prev.length<50)return clean(prev);
+    }
+  }
+  // "Dublin D04 C2Y6"
+  {const m=last.match(RX.irishFull);if(m)return clean(m[1]);}
+  // Irish Vxx xxxx — check prev for cityZone first, then plain city
+  if(RX.irish.test(last)&&prev){
+    const mz=prev.match(RX.cityZone);
+    if(mz&&parseInt(mz[2])<=30&&!isStreet(mz[1])&&!isProv(mz[1]))return clean(mz[1]);
+    const c=stc(prev);if(!hasDigit(c)&&c.length<40)return tcase(c);
+  }
+  // "Dublin 2" / "Dublin 4" — city + zone number ≤ 30
+  {const m=last.match(RX.cityZone);
+    if(m&&parseInt(m[2])<=30&&!isStreet(m[1])&&!isProv(m[1]))return clean(m[1]);}
+
+  // NL: NNNN XX City
+  {const m=last.match(RX.nl);if(m)return clean(m[2]);}
+  // EU prefix
+  {const m=last.match(RX.euPfx);
+    if(m){
+      let cp=m[2];
+      if(RX.region.test(cp.split(',')[0])){const after=cp.split(',').slice(1).join(',').trim();if(after)return clean(stripP(after));}
+      if(RX.region.test(cp)){
+        for(let i=parts.length-2;i>=0;i--){
+          const commas=parts[i].split(',').map(s=>s.trim()).filter(Boolean);
+          for(const c of [...commas].reverse())
+            if(c&&!hasDigit(c)&&!isStreet(c)&&c.length>2&&c.length<40&&!isProv(c)&&!RX.region.test(c))return tcase(c);
+        }
+      }
+      return clean(stripP(cp.split(',')[0]).replace(/\s+cedex\b.*/i,'').trim());
+    }
+  }
+  // Japanese City+postcode last
+  {const m=last.match(RX.jpCity);
+    if(m){
+      for(let i=parts.length-2;i>=0;i--){const ms=parts[i].match(RX.jpShi);if(ms)return tcase(ms[1].trim());}
+      return tcase(m[1].trim());
+    }
+  }
+  // Plain postcode: NNNN+ City
+  {const m=last.match(RX.plain);
+    if(m){
+      const cp=stripP(m[1]);
+      const allC=[...cp.matchAll(/([A-Za-z][A-Za-z\s]+?)\s+City\b/gi)];
+      if(allC.length)return clean(allC[0][1]);
+      if(isProv(cp.split(',')[0])){
+        for(let i=parts.length-2;i>=0;i--){const mc=parts[i].match(RX.chinC);if(mc)return clean(mc[1]);}
+      }
+      // Also check prev last comma-token — may be a cleaner city name (e.g. repeated in address)
+      const plainCity=clean(cp.split(',')[0]);
+      if(prev){
+        const prevToks=prev.split(',').map(s=>s.trim()).filter(Boolean);
+        const prevLast=prevToks[prevToks.length-1];
+        if(prevLast&&!hasDigit(prevLast)&&!isStreet(prevLast)&&prevLast.length<40&&!isProv(prevLast)
+           &&prevLast.toLowerCase()!==plainCity.toLowerCase()){
+          // Prefer prev last token if it appears multiple times in prev (repeated = city name)
+          // OR if it appears in any earlier segment
+          const inEarlier=parts.slice(0,parts.length-2).some(p=>p.toLowerCase().includes(prevLast.toLowerCase()));
+          const inPrevTwice=(prev.toLowerCase().split(prevLast.toLowerCase()).length-1)>=2;
+          if(inEarlier||inPrevTwice)return tcase(prevLast);
+        }
+      }
+      return plainCity;
+    }
+  }
+  // Reversed: state abbrev + zip + city "VA 23230 Richmond"
+  {const m=last.match(RX.revCity);if(m&&!isStreet(m[1]))return clean(m[1]);}
+  // Malta-style: letters+digits postcode + city "QRM 9088 Qormi"
+  {const m=last.match(RX.pcCity);if(m&&!isStreet(m[1]))return clean(m[1]);}
+  // Canadian full province: "City ONTARIO A1A 1A1"
+  {const m=last.match(RX.caFull);
+    if(m){
+      let city=m[1].replace(/^#\d+\s+/,'').replace(/,+$/,'').trim();
+      city=city.replace(/\b(?:suite|floor|apt|unit)\b.*/i,'').replace(/,+$/,'').trim();
+      if(city&&!isProv(city)&&!isStreet(city))return tcase(city);
+    }
+  }
+  // Canadian alpha postcode no separator "Toronto M4W1J2"
+  {const idx=last.search(RX.caAlpha);
+    if(idx>0){
+      let before=last.slice(0,idx).trim().replace(/,+$/,'').trim();
+      // strip trailing 2-char province abbreviation (e.g. "Toronto ON")
+      const bw=before.split(/\s+/);
+      while(bw.length&&/^[A-Z]{2}$/.test(bw[bw.length-1]))bw.pop();
+      before=bw.join(' ').trim().replace(/,+$/,'').trim();
+      if(before&&!isProv(before)&&!isStreet(before))return tcase(before);
+      if(prev&&!hasDigit(prev)&&!isStreet(prev)&&!isProv(prev))return clean(prev);
+    }
+  }
+  // US/CA 2-3 letter state abbreviation
+  {const m=last.match(RX.usca);
+    if(m){
+      const stripped=last.replace(/,?\s+[A-Z]{2,3}\s+[A-Z]?\d[\w\s-]{3,10}$/,'').trim();
+      let words=stripped.split(/\s+/);
+      const origCr=words.join(' ').trim().replace(/,+$/,'').trim();
+      while(words.length&&isProv(words[words.length-1]))words.pop();
+      let cr=words.join(' ').trim().replace(/,+$/,'').trim();
+      if(!cr||isProv(cr)){
+        if(prev&&!isStreet(prev)&&!hasDigit(prev)&&!isProv(prev))return tcase(stc(prev));
+        if(origCr&&isProv(origCr))return tcase(origCr); // "New York" is both city and state
+        return null;
+      }
+      cr=cr.replace(/^#\d+\s+/,'').trim();
+      const cp=cr.split(',').map(s=>s.trim()).filter(Boolean);
+      for(let i=cp.length-1;i>=0;i--){const c=cp[i];if(c&&!RX.skip.test(c)&&!/^\d/.test(c)&&!isProv(c))return tcase(c);}
+      return tcase(cp[0]||cr);
+    }
+  }
+  // "City State Zip" full state name: "Batesville Indiana 47006"
+  {const m=last.match(RX.csz);
+    if(m){
+      const mc=m[1].replace(/,+$/,'').trim(),ms=m[2];
+      if(isProv(ms)&&!isStreet(mc)&&!isProv(mc))return tcase(mc);
+    }
+  }
+  // "City, State Zip": "New York, New York 10017"
+  {const m=last.match(RX.ccsz);
+    if(m){
+      const mc=m[1].trim(),ms=m[2].trim();
+      if(isProv(ms)&&!isStreet(mc))return tcase(mc);
+    }
+  }
+  // NZ/generic "City N-6digits"
+  {const m=last.match(RX.cityZip);
+    if(m){
+      const city=m[1].replace(/,+$/,'').trim();
+      if(!isStreet(city)&&!isProv(city)){
+        // Check if prev's last comma-token is a repeated/confirmed city name (overrides)
+        if(prev){
+          const prevToks=prev.split(',').map(s=>s.trim()).filter(Boolean);
+          const prevLast=prevToks[prevToks.length-1];
+          if(prevLast&&!hasDigit(prevLast)&&!isStreet(prevLast)&&prevLast.length<40&&!isProv(prevLast)
+             &&prevLast.toLowerCase()!==city.toLowerCase()){
+            const inEarlier=parts.slice(0,parts.length-2).some(p=>p.toLowerCase().includes(prevLast.toLowerCase()));
+            const inPrevTwice=(prev.toLowerCase().split(prevLast.toLowerCase()).length-1)>=2;
+            if(inEarlier||inPrevTwice)return tcase(prevLast);
+          }
+        }
+        return tcase(city);
+      }
+    }
+  }
+  // Korean -si
+  for(const p of parts){const m=p.match(RX.krSi);if(m)return tcase(m[1].trim());}
+  // Japanese -shi/-SHI
+  for(const p of parts){const m=p.match(RX.jpShi);if(m)return tcase(m[1].trim().split(/[\s,]+/).pop());}
+  // Chinese City keyword
+  for(let i=parts.length-1;i>=0;i--){const m=parts[i].match(RX.chinC);if(m){const c=m[1].trim().replace(/,+$/,'');if(!isProv(c))return clean(c);}}
+  // Standalone last/prev
+  if(last&&!hasDigit(last)&&!isStreet(last)&&last.length<50&&!isProv(last))return clean(last);
+  if(prev&&!hasDigit(prev)&&!isProv(prev)){
+    // Return last clean comma-token rather than full string (e.g. "thudiyalur post, coimbatore" → "coimbatore")
+    const toks=prev.split(',').map(s=>s.trim()).filter(Boolean);
+    for(let i=toks.length-1;i>=0;i--){
+      const t=toks[i];
+      if(t&&!isStreet(t)&&t.length>1&&t.length<40)return tcase(t);
+    }
+  }
+  // Last resort comma-token scan
+  for(let i=parts.length-1;i>=0;i--){
+    const m=parts[i].match(RX.cityPc);if(m)return clean(m[1]);
+    const commas=parts[i].split(',').map(s=>s.trim()).filter(Boolean);
+    for(let j=commas.length-1;j>=0;j--){
+      const c=commas[j];
+      if(c&&!hasDigit(c)&&!isStreet(c)&&c.length>2&&c.length<40&&!isProv(c)&&!RX.region.test(c))
+        if(!/^(?:suite|floor|apt|unit|bldg|ste|r-n|obl|liter)\b/i.test(c))return tcase(c);
+    }
+  }
+  return null;
+}
+
+// ── Build output ───────────────────────────────────────────────────────────────
+function buildOut(hdr,processed){
+  const out=[...hdr];
+  for(const{rec,city}of processed){
+    const ls=[...rec.lines];
+    if(city&&rec.i9!==-1&&rec.i16!==-1)ls.splice(rec.i9+1,0,'0006 : '+city);
+    out.push(...ls);
+  }
+  return out.join('\n');
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────────
+function show(id){document.getElementById(id).classList.remove('hidden');}
+function hide(id){document.getElementById(id).classList.add('hidden');}
+function setBar(p){document.getElementById('prog').style.width=p+'%';}
+function setStat(id,v){document.getElementById(id).textContent=v;}
+function setStatus(s){document.getElementById('status-msg').textContent=s;}
+function showErr(msg){document.getElementById('err-msg').textContent=msg;show('err-box');}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+let _uid=0;
+function addLogRow(cid,type,icon,ref,city,note,detailLines){
+  const el=document.getElementById(cid);if(!el)return;
+  const row=document.createElement('div');
+  row.className='log-row '+type;
+  const uid='ld'+(++_uid);
+  const hasD=detailLines&&detailLines.length>0;
+  row.innerHTML='<span class="log-icon">'+icon+'</span>'
+    +'<span class="log-ref">'+escHtml(ref||'')+'</span>'
+    +'<span class="log-city">'+escHtml(city)+'</span>'
+    +(note?'<span class="log-note">'+escHtml(note)+'</span>':'')
+    +(hasD?'<button class="log-toggle" onclick="togD(\''+uid+'\')">show address &#9662;</button>'
+           +'<div class="log-detail" id="'+uid+'">'+escHtml(detailLines.join('\n'))+'</div>':'');
+  el.appendChild(row);
+  el.scrollTop=el.scrollHeight;
+}
+function togD(id){
+  const el=document.getElementById(id);if(!el)return;
+  const open=el.classList.toggle('open');
+  if(el.previousElementSibling)el.previousElementSibling.textContent=open?'hide address \u25b4':'show address \u25be';
+}
+function renderLog(cid,processed){
+  const el=document.getElementById(cid);el.innerHTML='';
+  processed.forEach(p=>{
+    const ref=p.rec.ref89||'\u2014';
+    if(p.rec.has16&&p.city)
+      addLogRow(cid,'ok','\u2713',ref,p.city,p.manual?'(manual)':null,null);
+    else if(p.rec.has16&&!p.city)
+      addLogRow(cid,'warn','?',ref,'city unclear \u2014 skipped',null,p.rec.addr16.split('\xb3').map(s=>s.trim()).filter(Boolean));
+    else
+      addLogRow(cid,'skip','\u2014',ref,'no 0016 address',null,null);
+  });
+}
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let outBlob=null,outName='',gHdr=[],gProcessed=[];
+
+// ── Main ───────────────────────────────────────────────────────────────────────
+async function go(file){
+  if(!file.name.endsWith('.txt')){showErr('Please upload a .txt file.');return;}
+  hide('err-box');hide('done-card');hide('review-card');hide('howto');show('proc-card');
+  document.getElementById('proc-log').innerHTML='';
+  outName='PREP_'+file.name.replace(/\.txt$/i,'')+'.txt';
+  document.getElementById('proc-lbl').textContent='Processing '+file.name;
+  let raw;
+  try{const buf=await file.arrayBuffer();raw=readL1(buf);}
+  catch(e){showErr('Could not read file: '+e.message);hide('proc-card');return;}
+  await new Promise(r=>setTimeout(r,0));
+
+  const{hdr,recs}=parseRecs(raw);
+  gHdr=hdr;
+  const total=recs.length;
+  setStat('s-tot',total);setStatus('Found '+total+' records');
+
+  const processed=[];
+  let done=0,unclear=0;
+  for(let i=0;i<recs.length;i++){
+    const rec=recs[i];
+    const ref=rec.ref89||'\u2014';
+    let city=null;
+    if(rec.has16){
+      city=extractCity(rec.addr16,rec.country18,rec.code05);
+      const addr=rec.addr16.split('\xb3').map(s=>s.trim()).filter(Boolean);
+      if(city)
+        addLogRow('proc-log','ok','\u2713',ref,city,(/luxembourg/i.test(rec.country18)||(rec.code05||'').trim().toUpperCase()==='LUXE')?'(from 0018/0005)':null,null);
+      else{
+        unclear++;
+        addLogRow('proc-log','warn','?',ref,'city unclear',null,addr);
+      }
+    } else {
+      addLogRow('proc-log','skip','\u2014',ref,'no 0016 address',null,null);
+    }
+    processed.push({rec,city,recIdx:i+1,manual:false});
+    done++;
+    if(done%200===0||done===total){
+      setStat('s-don',done);setStat('s-skp',unclear);
+      setBar(Math.round(done/total*95));
+      setStatus('Processing record '+done+' of '+total+'\u2026');
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  setBar(100);
+  gProcessed=processed;
+  hide('proc-card');
+  const unclear2=processed.filter(p=>p.rec.has16&&!p.city);
+  if(unclear2.length>0)showReview(unclear2);
+  else finalize();
+}
+
+// ── Review ─────────────────────────────────────────────────────────────────────
+function showReview(items){
+  document.getElementById('review-banner-text').textContent=
+    items.length+' record'+(items.length===1?' has':'s have')+' an unclear city. Fill them in below, or leave blank to skip.';
+  buildFillList('review-list',items);
+  show('review-card');
+}
+function applyReview(){applyFillList('review-list');hide('review-card');finalize();}
+function skipAllReview(){hide('review-card');finalize();}
+
+// ── Finalize ───────────────────────────────────────────────────────────────────
+function finalize(){
+  rebuildBlob();
+  const total=gProcessed.length,injected=gProcessed.filter(p=>p.city).length,skipped=total-injected;
+  setStat('d-tot',total);setStat('d-inj',injected);setStat('d-skp',skipped);
+  document.getElementById('done-sum').textContent=
+    total+' records processed \u2014 '+injected+' cities injected, '+skipped+' skipped.';
+  renderLog('done-log',gProcessed);
+  const still=gProcessed.filter(p=>p.rec.has16&&!p.city);
+  if(still.length>0){buildFillList('skipped-list',still);show('skipped-fill');}
+  else hide('skipped-fill');
+  show('done-card');
+}
+
+// ── Skipped fill ───────────────────────────────────────────────────────────────
+function applySkipped(){
+  applyFillList('skipped-list');
+  rebuildBlob();
+  const total=gProcessed.length,injected=gProcessed.filter(p=>p.city).length,skipped=total-injected;
+  setStat('d-inj',injected);setStat('d-skp',skipped);
+  document.getElementById('done-sum').textContent=
+    total+' records processed \u2014 '+injected+' cities injected, '+skipped+' skipped.';
+  renderLog('done-log',gProcessed);
+  const still=gProcessed.filter(p=>p.rec.has16&&!p.city);
+  if(still.length>0)buildFillList('skipped-list',still);
+  else hide('skipped-fill');
+}
+
+// ── Shared fill helpers ────────────────────────────────────────────────────────
+function buildFillList(listId,items){
+  const list=document.getElementById(listId);
+  list.innerHTML='';
+  items.forEach(({rec,recIdx})=>{
+    const addr=rec.addr16.split('\xb3').map(s=>s.trim()).filter(Boolean);
+    const addrHtml=addr.map(l=>'<span>'+escHtml(l)+'</span>').join('');
+    const div=document.createElement('div');
+    div.className='review-item';
+    div.dataset.recIdx=recIdx;
+    div.innerHTML='<div class="review-addr">'+addrHtml
+      +(rec.country18?'<span style="color:var(--accent-d);margin-top:2px">0018: '+escHtml(rec.country18)+'</span>':'')
+      +'</div><div class="review-row"><span class="review-label">0006 :</span>'
+      +'<input class="review-input" type="text" placeholder="Enter city (or leave blank)" autocomplete="off" spellcheck="false"></div>';
+    list.appendChild(div);
+  });
+}
+function applyFillList(listId){
+  document.querySelectorAll('#'+listId+' .review-item').forEach(item=>{
+    const idx=parseInt(item.dataset.recIdx);
+    const val=item.querySelector('.review-input').value.trim();
+    const entry=gProcessed.find(p=>p.recIdx===idx);
+    if(entry&&val){entry.city=val;entry.manual=true;}
+  });
+}
+function rebuildBlob(){
+  outBlob=new Blob([encL1(buildOut(gHdr,gProcessed))],{type:'text/plain'});
+}
+
+// ── Save As ────────────────────────────────────────────────────────────────────
+async function dlFile(){
+  if(!outBlob)return;
+  if(window.showSaveFilePicker){
+    try{
+      const fh=await window.showSaveFilePicker({suggestedName:outName,types:[{description:'Text file',accept:{'text/plain':['.txt']}}]});
+      const ws=await fh.createWritable();
+      await ws.write(outBlob);
+      await ws.close();
+      return;
+    }catch(e){if(e.name==='AbortError')return;}
+  }
+  const url=URL.createObjectURL(outBlob);
+  const a=document.createElement('a');a.href=url;a.download=outName;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+// ── Reset ──────────────────────────────────────────────────────────────────────
+function reset(){
+  hide('proc-card');hide('done-card');hide('review-card');hide('err-box');show('howto');
+  document.getElementById('proc-log').innerHTML='';
+  outBlob=null;gHdr=[];gProcessed=[];_uid=0;
+  setBar(0);setStat('s-tot',0);setStat('s-don',0);setStat('s-skp',0);setStatus('');
+  document.getElementById('fi').value='';
+}
+</script>
+<footer style="width:100%;text-align:center;padding:2rem 1rem 1.5rem;font-size:12px;color:var(--faint);margin-top:auto">
+  Poorly &ldquo;developed&rdquo; by Giovanni Trano
+</footer>
+</body>
+</html>
