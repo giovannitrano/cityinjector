@@ -246,12 +246,28 @@ function parseRecs(raw){
 // ── City extraction ────────────────────────────────────────────────────────────
 function extractCity(addr16,country18,code05){
   const isLux=/luxembourg/i.test(country18)||(code05||'').trim().toUpperCase()==='LUXE';
-  if(isLux)return 'Luxembourg';
+  // Luxembourg communes — try to match one before falling back to generic 'Luxembourg'
+  const LUX_CITIES=/\b(luxembourg(?:\s*city)?|esch(?:[- ]sur[- ]alzette)?|differdange|dudelange|sanem|petange|hesperange|bettembourg|kayl|schifflange|bertrange|leudelange|mamer|strassen|kehlen|kopstal|mersch|diekirch|ettelbruck|wiltz|clervaux|vianden|echternach|remich|grevenmacher|mondorf|senningerberg|niederanven|sandweiler|roeser|waldbredimus|mondercange|rumelange|soleuvre|oberkorn|rodange|bascharage|clemency|garnich|hobscheid|rambrouch|useldange|bissen|larochette|consdorf|beaufort|waldbillig|junglinster|steinsel|walferdange|gasperich|beggen|cents|kirchberg|belval|limpertsberg|belair|rollingergrund)\b/i;
   const parts=addr16.split('\xb3').map(s=>s.trim()).filter(Boolean);
   if(!parts.length)return null;
+  // For Luxembourg: scan parts for known commune names first
+  if(isLux){
+    for(const p of parts){
+      const m=p.match(LUX_CITIES);
+      if(m){
+        // Normalise: "luxembourg city" → "Luxembourg", "esch-sur-alzette" → "Esch-sur-Alzette"
+        let lc=m[1].trim().toLowerCase();
+        if(/^luxembourg/.test(lc))return 'Luxembourg';
+        return lc.replace(/(?:^|-)\w/g,ch=>ch.toUpperCase());
+      }
+    }
+  }
   const result=cityFromParts(parts);
   // Never return a digits-only string as a city
-  if(result&&/^\d+$/.test(result.trim()))return null;
+  if(result&&/^\d+$/.test(result.trim())){
+    return isLux?'Luxembourg':null;
+  }
+  if(!result&&isLux)return 'Luxembourg';
   return result;
 }
 
@@ -284,35 +300,67 @@ const PROV=new Set([
   'goa','gujarat','haryana','himachal pradesh','jharkhand','karnataka','kerala',
   'madhya pradesh','maharashtra','manipur','meghalaya','mizoram','nagaland','odisha',
   'punjab','rajasthan','sikkim','tamil nadu','telangana','tripura','uttar pradesh',
-  'uttarakhand','west bengal','delhi','jammu and kashmir','ladakh'
+  'uttarakhand','west bengal','delhi','jammu and kashmir','ladakh',
+  // Chinese provinces & country name
+  'china','guangdong','shaanxi','shanxi','shandong','hebei','henan','hubei',
+  'hunan','yunnan','guizhou','fujian','jiangxi','jilin','heilongjiang',
+  'inner mongolia','xinjiang','tibet','qinghai','gansu','ningxia','hainan',
+  // Japanese prefectures (when used as postcode city)
+  'kanagawa','aichi','fukuoka','hyogo','chiba','saitama','shizuoka','ibaraki',
+  'hiroshima','miyagi','niigata','nagano','gifu','tochigi','gunma','okayama',
+  'kagoshima','ehime','kumamoto','yamaguchi','nagasaki','mie','oita','nara',
+  'ishikawa','toyama','wakayama','akita','yamagata','iwate','fukushima','aomori',
+  'hokkaido',
+  // Russian krai/oblast common cases
+  'primorsky krai','khabarovsk krai','krasnoyarsk krai','perm krai',
+  // Romanian judet
+  'ilfov','judet ilfov',
+  // Korean provinces (do)
+  'gyeonggi-do','gyeonggi','gangwon-do','chungcheongbuk-do','chungcheongnam-do',
+  'jeollabuk-do','jeollanam-do','gyeongsangbuk-do','gyeongsangnam-do','jeju-do',
+  // Other region words
+  'gautam buddha nagar','minas gerais','vale do sereno'
 ]);
 
 const RX={
-  uk:       /\b[A-Z]{1,2}\d[\dA-Z]?\s*\d[A-Z]{2}\b/,
+  uk:       /\b[A-Za-z]{1,2}\d[\dA-Za-z]?\s*\d[A-Za-z]{2}\b/,
   nl:       /(?:[A-Z]{1,3}-)?\d{4}\s+([A-Z]{2})\s+(.+)/,
   euPfx:    /^([A-Z]{1,3})-[\d][\d\s-]{2,7}\s+(.+)/,
   plain:    /^\d[\d\s-]{3,8}\s+([A-Z\u00c0-\u00dd].+)/i,
   usca:     /^(.+?),?\s+([A-Z]{2,3})\s+[A-Z]?\d[\w\s-]{3,10}$/,
   caFull:   /^(.+?)\s+(ONTARIO|BRITISH COLUMBIA|ALBERTA|QUEBEC|NOVA SCOTIA|NEW BRUNSWICK|PRINCE EDWARD ISLAND|NEWFOUNDLAND|MANITOBA|SASKATCHEWAN)\s+[A-Z]\d[A-Z]\s*\d[A-Z]\d\s*$/i,
+  auState:  /^(.+?)\s+(QLD|NSW|VIC|SA|WA|TAS|ACT|NT)\s*\d{4}\s*$/i,
   caAlpha:  /[A-Z]\d[A-Z]\s*\d[A-Z]\d$/,
   cityZip:  /^([A-Z][A-Za-z\s]+?)\s+(\d{3,6})\s*$/i,
   revCity:  /^\d[\d\s-]{2,7}\s+([A-Z][A-Za-z\s]+?)\s*$/i,
   pcCity:   /^[A-Z]{2,4}\s+\d{3,5}\s+([A-Z][A-Za-z\s]+?)\s*$/i,
-  irish:    /^[A-Z]\d{2}\s+\w{4}$/,
-  irishFull:/^([A-Za-z][A-Za-z\s]*?)\s+[A-Z]\d{2}\s+\w{4}$/i,
+  irish:    /^[A-Za-z]\d{2}\s+\w{4}$/,
+  irishFull:/^([A-Za-z][A-Za-z\s,'-]*?)\s+[A-Z]\d{2}\s+\w{4}$/i,
   cityZone: /^([A-Z][A-Za-z\s]+?)\s+(\d{1,2})\s*$/i,
   sing:     /^SINGAPORE\s*\d+/i,
   jpShi:    /,?\s*([^,\d\s][^,\d]*?)-[Ss][Hh][Ii]\b/,
   jpCity:   /^([A-Za-z][A-Za-z\s]+?)\s+\d{3}-\d{4}$/,
   krSi:     /([A-Za-z][A-Za-z\s]+?)-si\b/i,
   chinC:    /([A-Za-z][A-Za-z\s]+?)\s+City\b/i,
-  region:   /\b(?:Region|Province|Oblast|Raion|Republic|State|County|Shire|Cambridgeshire|Gangwon|Selangor|Gujarat|Maharashtra|Tatarstan)\b/i,
+  region:   /\b(?:Region|Province|Oblast|Raion|Republic|State|County|Shire|Cambridgeshire|Gangwon|Selangor|Gujarat|Maharashtra|Tatarstan|Krai|District|Sub-district|Judet|Nagar\s+(?:district)?|Prefecture|Subdistrict|Community|Arrondissement)\b/i,
   uaCity:   /\bm\.\s+([A-Z\u00c0-\u00dd][^,\d]+?)(?:,|\s+\d|$)/i,
   cityPc:   /^([A-Z\u00c0-\u00dd][A-Za-z\u00c0-\u00ff\s-]+?),\s*\d+\s*$/,
-  street:   /\b(?:street|avenue|road|boulevard|drive|lane|way|court|str\.|rue|via|calle|ul\.|stra[sß]e|suite|floor|building|bldg|blvd|ave\.?|rd\.?|alley|highway|hwy|expressway|chome|mah\.|mahallesi|cad\.|cadde|route)\b/i,
+  street:   /\b(?:street|avenue|road|boulevard|drive|lane|way|court|str\.|rue|via|calle|ul\.|stra[sß]e|suite|floor|building|bldg|blvd|ave\.?|rd\.?|alley|highway|hwy|expressway|chome|mah\.|mahallesi|cad\.|cadde|route|sub-district|sub-zone|industrial\s+estate|business\s+park|technology\s+park|tech\s+park|science\s+park|(?:^|\s)[úu]t(?:\s|$)|utca|gata|straat|laan|gasse|allee|nagar\s+road|marg\b)\b/i,
   skip:     /(?:suite|floor|#|apt|unit|building|bldg|ste\.?|avenue|street|road|boulevard|drive|way|lane|industrial|park|center|centre|market|campus|garden|research|block|wing|tower)\b/i,
   county:   /(?:shire|borough|wick|sex|folk|land|set)$/i,
-  skipFst:  /^(?:c\/o|care\s+of|zac\s|attn|attention|p\.?o\.?\s*box)/i,
+  ukCounty: /^(?:surrey|kent|essex|suffolk|norfolk|devon|dorset|somerset|wiltshire|oxfordshire|berkshire|hampshire|hertfordshire|bedfordshire|buckinghamshire|cambridgeshire|cheshire|cornwall|cumbria|derbyshire|durham|gloucestershire|herefordshire|leicestershire|lincolnshire|merseyside|northamptonshire|northumberland|nottinghamshire|shropshire|staffordshire|warwickshire|worcestershire|yorkshire|lancashire|midlands)$/i,
+  skipFst:  /^(?:c\/o|care\s+of|zac\s|attn|attention|p\.?o\.?\s*box|zone\s+industrielle|crta\s|carretera\s|impasse\s)/i,
+  // Legal entity suffixes — first segment is a company name, not a city
+  // Note: no trailing \b — dotted abbreviations like S.A. end with \W so \b never matches after them
+  companyFirst: /\b(?:b\.v\.|s\.a\.|s\.a\.s\.|s\.r\.l\.|gmbh|ltd\.?|llc|inc\.?|pty\.?|corp\.?|n\.v\.|a\.s\.|s\.p\.a\.|limited\s+liability|liability\s+company|kosher|s\.a\.u\.|s\.l\.|s\.c\.p\.a\.|ab\.?\b|oy\b|plc\.?|l\.l\.c\.|spaces\b)|^limited\b|\bas\b/i,
+  // Trailing qualifiers to strip from extracted city
+  trailQual: /\s*[-\/,]\s*(?:PR|SP|MG|RJ|RS|SC|GO|BA|PE|CE|PA|AM|MA|ES|PB|RN|MT|MS|RO|TO|AC|AP|RR|SE|DF|AL|PI)\s*$/i,
+  // "Yafo" suffix for Tel Aviv
+  telAvivYafo: /^(.+?)\s*-\s*yafo\s*$/i,
+  // City Number (Praha 4, Dublin 4) — strip trailing space+digit(s)
+  cityNum: /^(.+?)\s+\d{1,2}$/,
+  // "City" keyword for JAPA/CHIN
+  cityKw:  /([A-Za-z][A-Za-z\s']+?)\s+City\b/i,
   csz:      /^(.*?[A-Za-z])\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+\d{4,6}\s*$/,
   ccsz:     /^([^,]+),\s*([^,\d]+?)\s+\d{4,6}\s*$/,
 };
@@ -322,32 +370,65 @@ function isProv(s){return PROV.has(s.trim().toLowerCase())||RX.region.test(s);}
 function hasDigit(s){return /\d/.test(s);}
 function isRD(s){return /^RD\s*\d/i.test(s.trim());}
 
+// CHIN major city list — detect city names embedded in zone/district descriptions
+// e.g. "Wuhan East Lake High-Tech Zone", "Nanjing High-Tech Zone", "Hefei Area"
+const CHIN_CITIES=['Beijing','Shanghai','Guangzhou','Shenzhen','Chongqing','Chengdu',
+  'Wuhan','Hangzhou','Nanjing','Tianjin','Xian','Suzhou','Qingdao','Zhengzhou',
+  'Changsha','Kunming','Hefei','Fuzhou','Jinan','Harbin','Urumqi','Nanchang',
+  'Shijiazhuang','Taiyuan','Guiyang','Lanzhou','Nanning','Hohhot','Yinchuan',
+  'Xining','Lhasa','Jinjiang','Dongguan','Foshan','Wenzhou','Ningbo','Wuxi',
+  'Xiamen','Shenyang','Dalian','Changchun','Nantong','Zhenjiang','Yangzhou',
+  'Wenling','Taizhou','Jiaxing','Huzhou','Shaoxing','Jinhua','Quanzhou','Putian',
+  'Shantou','Zhuhai','Zhongshan','Jiangmen','Zhuzhou','Hengyang','Yueyang',
+  'Changde','Huaihua','Xiangtan','Loudi','Baoding','Tangshan','Langfang',
+  'Cangzhou','Handan','Xingtai','Chengde','Zhangjiakou','Qinhuangdao',
+  'Weifang','Yantai','Linyi','Jining','Taian','Liaocheng','Dezhou',
+  'Binzhou','Dongying','Zaozhuang','Rizhao','Laiwu','Heze',
+  'Luoyang','Kaifeng','Xinxiang','Nanyang','Zhoukou','Xinyang'];
+
 function cityFromParts(parts){
   for(const p of parts)if(/ho\s+chi\s+minh\s+city/i.test(p))return 'Ho Chi Minh City';
   for(const p of parts)if(RX.sing.test(p))return 'Singapore';
 
   const last=parts[parts.length-1],prev=parts.length>=2?parts[parts.length-2]:'',first=parts[0];
 
-  // Ukrainian m. City
+  // Ukrainian m. City and Russian g.City (g. = gorod = city)
   for(const p of parts){const m=p.match(RX.uaCity);if(m)return clean(m[1]);}
+  for(const p of parts){const m=p.match(/\bg\.([A-Z\u00c0-\u00dd][A-Za-z\u00c0-\u00ff\s-]+?)(?:,|\s+g\.o\.|\s+\d|$)/);if(m)return clean(m[1]);}
   // City, postcode
   {const m=last.match(RX.cityPc);if(m)return clean(m[1]);}
   // Last is pure province → prev
   if(isProv(last)&&!hasDigit(last)){
+    // Xi'an explicit
+    for(const p of parts.slice(0,-1)){if(/xi'?\s*an\b/i.test(p))return "Xi'an";}
+    // CHIN major cities scan FIRST — detect names like Hefei, Wuhan, Nanjing in zone descriptions
+    for(const p of parts.slice(0,-1)){
+      for(const city of CHIN_CITIES){
+        if(new RegExp('(?:^|[\\s,])'+city+'(?:[\\s,\\-]|$)','i').test(p))return tcase(city);
+      }
+    }
+    // City keyword — take last word only (avoid "Changhe Economic" from "Changhe Economic City")
+    for(const p of parts.slice(0,-1)){
+      const mc=p.match(RX.cityKw);
+      if(mc){const wds=mc[1].trim().split(/\s+/);const cw=wds[wds.length-1];if(!isProv(cw))return tcase(cw);}
+    }
     const mc=prev.match(RX.chinC);if(mc)return clean(mc[1]);
     if(prev&&!hasDigit(prev)&&!isProv(prev)){
       // Extract last clean comma-token from prev rather than full string
       const toks=prev.split(',').map(s=>s.trim()).filter(Boolean);
       for(let i=toks.length-1;i>=0;i--){
-        const t=toks[i];
-        if(t&&!isStreet(t)&&t.length>1&&t.length<40)return tcase(t);
+        let t=toks[i];
+        if(t&&!isStreet(t)&&t.length>1&&t.length<40){
+          // Strip Korean -si suffix (Seongnam-si → Seongnam)
+          const siM=t.match(/^([A-Za-z][A-Za-z\s]+?)-si\s*$/i);
+          if(siM)t=siM[1].trim();
+          return tcase(t);
+        }
       }
     }
   }
   // First segment = city (no digits, no street, has postcode at end)
-  if(parts.length>=2&&!hasDigit(first)&&!isStreet(first)&&!RX.skipFst.test(first)
-      &&first.indexOf(',')===-1&&first.length<40&&hasDigit(last)&&!isProv(first)&&!isRD(first))
-    return clean(first);
+  // [first-segment city rule moved below postcode rules]
 
   // UK postcode (with or without space: W1G7HH or W1G 7HH)
   {const m=last.match(RX.uk);
@@ -356,10 +437,17 @@ function cityFromParts(parts){
       if(before){
         const cp=before.split(',').map(s=>s.trim()).filter(Boolean);
         let city=cp[cp.length-1];
-        if(RX.county.test(city)&&cp.length>1)city=cp[0];
+        // If last comma chunk is a UK county, take first chunk
+        if((RX.county.test(city)||RX.ukCounty.test(city))&&cp.length>1)city=cp[0];
         const words=city.split(/\s+/);
-        if(words.length>=2&&RX.county.test(words[words.length-1]))city=words.slice(0,-1).join(' ');
-        return tcase(city.trim());
+        if(words.length>=2&&(RX.county.test(words[words.length-1])||RX.ukCounty.test(words[words.length-1])))
+          city=words.slice(0,-1).join(' ');
+        // Deduplicate "City City" pattern (Milton Keynes Milton Keynes → Milton Keynes)
+        city=city.trim();
+        const hw=city.split(/\s+/);
+        const mid=Math.floor(hw.length/2);
+        if(hw.length>=2&&hw.slice(0,mid).join(' ')===hw.slice(mid).join(' '))city=hw.slice(0,mid).join(' ');
+        return tcase(city);
       }
       if(prev&&!hasDigit(prev)&&prev.length<50)return clean(prev);
     }
@@ -390,14 +478,48 @@ function cityFromParts(parts){
             if(c&&!hasDigit(c)&&!isStreet(c)&&c.length>2&&c.length<40&&!isProv(c)&&!RX.region.test(c))return tcase(c);
         }
       }
-      return clean(stripP(cp.split(',')[0]).replace(/\s+cedex\b.*/i,'').trim());
+      const euRaw=cp.split(',')[0].trim();
+      let euCity=(stripP(euRaw)||euRaw.replace(/^\(|\)$/g,'')).replace(/\s+cedex\b.*/i,'').trim();
+      // If result contains digits (e.g. "Grajski trg 21 Race"), last word may be city
+      if(/\d/.test(euCity)){
+        const words=euCity.trim().split(/\s+/);
+        const lastW=words[words.length-1];
+        if(lastW&&!hasDigit(lastW)&&lastW.length>1)euCity=lastW;
+      }
+      // Strip trailing punctuation (trailing period etc)
+      euCity=euCity.replace(/[.\s]+$/,'').trim();
+      // Strip trailing city-district number (Praha 4 → Praha)
+      {const mn=euCity.match(RX.cityNum);if(mn&&!(/\d/.test(mn[1])))euCity=mn[1].trim();}
+      // Strip parenthesised qualifier
+      euCity=euCity.replace(/\s*\(.*?\)\s*$/,'').trim();
+      // If euCity is a street (e.g. "Szolnoki út" after stripping number), trust first segment
+      if(isStreet(euCity)&&parts.length>=2&&!hasDigit(first)&&!isStreet(first)&&!isProv(first)&&!RX.companyFirst.test(first))
+        return clean(first);
+      // If euCity still has digits (address line not a city), trust first segment instead
+      if(/\d/.test(euCity)&&parts.length>=2&&!hasDigit(first)&&!isStreet(first)&&!isProv(first)&&!RX.companyFirst.test(first))
+        return clean(first);
+      return clean(euCity);
     }
   }
   // Japanese City+postcode last
   {const m=last.match(RX.jpCity);
     if(m){
+      // Check for "Daito City" style keyword FIRST (cityKw) — overrides prefecture name
+      for(const p of parts.slice(0,-1)){
+        const mc=p.match(RX.cityKw);
+        if(mc&&!isProv(mc[1].trim()))return clean(mc[1]);
+      }
       for(let i=parts.length-2;i>=0;i--){const ms=parts[i].match(RX.jpShi);if(ms)return tcase(ms[1].trim());}
-      return tcase(m[1].trim());
+      const jpResult=m[1].trim();
+      if(!isProv(jpResult))return tcase(jpResult);
+      // jpCity result is prefecture — look for city in earlier parts
+      for(let i=parts.length-2;i>=0;i--){
+        const toks=parts[i].split(',').map(s=>s.trim()).filter(Boolean);
+        for(let j=toks.length-1;j>=0;j--){
+          const t=toks[j];
+          if(t&&!isProv(t)&&!isStreet(t)&&!hasDigit(t)&&t.length>1&&!RX.companyFirst.test(t))return clean(t);
+        }
+      }
     }
   }
   // Plain postcode: NNNN+ City
@@ -405,12 +527,40 @@ function cityFromParts(parts){
     if(m){
       const cp=stripP(m[1]);
       const allC=[...cp.matchAll(/([A-Za-z][A-Za-z\s]+?)\s+City\b/gi)];
-      if(allC.length)return clean(allC[0][1]);
-      if(isProv(cp.split(',')[0])){
-        for(let i=parts.length-2;i>=0;i--){const mc=parts[i].match(RX.chinC);if(mc)return clean(mc[1]);}
+      if(allC.length){const wds=allC[0][1].trim().split(/\s+/);return tcase(wds[wds.length-1]);}
+      const plainFirst=cp.split(',')[0].trim();
+      if(isProv(plainFirst)){
+        // Check if there's a city after a comma in same result (e.g. "Lat Phrao District, Bangkok")
+        const plainCommas=cp.split(',').map(s=>s.trim()).filter(Boolean);
+        for(let i=plainCommas.length-1;i>=0;i--){
+          const t=plainCommas[i];
+          if(t&&!isProv(t)&&!isStreet(t)&&!hasDigit(t)&&t.length>1)return clean(t);
+        }
+        // PASS 1: scan ALL parts for Xi'an and CHIN major cities first
+        for(const p of parts.slice(0,-1)){
+          if(/xi'?\s*an\b/i.test(p))return "Xi'an";
+          for(const city of CHIN_CITIES){
+            if(new RegExp('(?:^|[\\s,])'+city+'(?:[\\s,\\-]|$)','i').test(p))return tcase(city);
+          }
+        }
+        // PASS 2: City keyword and -shi patterns
+        for(const p of parts.slice(0,-1)){
+          const mc=p.match(RX.cityKw);
+          if(mc){const wds=mc[1].trim().split(/\s+/);const cw=wds[wds.length-1];if(!isProv(cw))return tcase(cw);}
+          const ms=p.match(RX.jpShi);if(ms)return tcase(ms[1].trim());
+        }
+        for(let i=parts.length-2;i>=0;i--){
+          const toks=parts[i].split(',').map(s=>s.trim()).filter(Boolean);
+          for(let j=toks.length-1;j>=0;j--){
+            const t=toks[j];
+            if(t&&!isProv(t)&&!isStreet(t)&&!hasDigit(t)&&t.length>1&&t.length<50
+               &&!RX.companyFirst.test(t)&&!RX.region.test(t))return clean(t);
+          }
+        }
       }
-      // Also check prev last comma-token — may be a cleaner city name (e.g. repeated in address)
-      const plainCity=clean(cp.split(',')[0]);
+      // Strip "- Yafo" suffix and also check prev last comma-token
+      const plainCityRaw=clean(plainFirst);
+      const plainCity=(()=>{const mty=plainCityRaw.match(/^(.+?)\s*-\s*yafo\s*$/i);return mty?tcase(mty[1].trim()):plainCityRaw;})();
       if(prev){
         const prevToks=prev.split(',').map(s=>s.trim()).filter(Boolean);
         const prevLast=prevToks[prevToks.length-1];
@@ -423,10 +573,20 @@ function cityFromParts(parts){
           if(inEarlier||inPrevTwice)return tcase(prevLast);
         }
       }
-      return plainCity;
+      // Strip trailing Brazilian state code (Curitiba - PR → Curitiba)
+      const cleanPlain=plainCity.replace(RX.trailQual,'').trim();
+      return cleanPlain||plainCity;
     }
   }
-  // Reversed: state abbrev + zip + city "VA 23230 Richmond"
+  // Brazilian dotted postal: "34.006-049 Nova Lima/MG"
+  {const m=last.match(/^\d{2}\.\d{3}-\d{3}\s+(.+)/);
+    if(m){
+      let bzCity=m[1].trim().replace(/\s*\/[A-Z]{2}$/,'').trim();
+      if(bzCity&&!isProv(bzCity)&&!isStreet(bzCity))return clean(bzCity);
+    }
+  }
+
+  // Reversed: state abbrev + zip + city "VA 23230 Richmond\"
   {const m=last.match(RX.revCity);if(m&&!isStreet(m[1]))return clean(m[1]);}
   // Malta-style: letters+digits postcode + city "QRM 9088 Qormi"
   {const m=last.match(RX.pcCity);if(m&&!isStreet(m[1]))return clean(m[1]);}
@@ -456,14 +616,26 @@ function cityFromParts(parts){
       const stripped=last.replace(/,?\s+[A-Z]{2,3}\s+[A-Z]?\d[\w\s-]{3,10}$/,'').trim();
       let words=stripped.split(/\s+/);
       const origCr=words.join(' ').trim().replace(/,+$/,'').trim();
+      const origWords=[...words];
       while(words.length&&isProv(words[words.length-1]))words.pop();
       let cr=words.join(' ').trim().replace(/,+$/,'').trim();
+      // If stripping province left only a trivially short fragment (<4 chars), restore origCr
+      if(cr.length>0&&cr.length<=4&&origWords.length>words.length){
+        cr=origWords.join(' ').trim().replace(/,+$/,'').trim();
+      }
       if(!cr||isProv(cr)){
         if(prev&&!isStreet(prev)&&!hasDigit(prev)&&!isProv(prev))return tcase(stc(prev));
         if(origCr&&isProv(origCr))return tcase(origCr); // "New York" is both city and state
         return null;
       }
       cr=cr.replace(/^#\d+\s+/,'').trim();
+      // Strip trailing AU suburb qualifier (Central, North, etc.) when state was AU
+      const auSt=last.match(/\b(QLD|NSW|VIC|SA|WA|TAS|ACT|NT)\s+\d{4}/i);
+      if(auSt){
+        const crWords=cr.split(/\s+/);
+        if(crWords.length>=2&&/^(?:central|north|south|east|west|inner|outer|upper|lower|cbd)$/i.test(crWords[crWords.length-1]))
+          cr=crWords.slice(0,-1).join(' ').trim();
+      }
       const cp=cr.split(',').map(s=>s.trim()).filter(Boolean);
       for(let i=cp.length-1;i>=0;i--){const c=cp[i];if(c&&!RX.skip.test(c)&&!/^\d/.test(c)&&!isProv(c))return tcase(c);}
       return tcase(cp[0]||cr);
@@ -483,8 +655,34 @@ function cityFromParts(parts){
       if(isProv(ms)&&!isStreet(mc))return tcase(mc);
     }
   }
-  // NZ/generic "City N-6digits"
-  {const m=last.match(RX.cityZip);
+  // "City, XX-YY NNNNN" — hyphenated state/region code (US-DE, etc.)
+  {const m=last.match(/^([^,\d][^,]*?),\s*[A-Z]{2,3}-[A-Z]{2,3}\s+\d{4,6}\s*$/i);
+    if(m&&!isStreet(m[1].trim()))return tcase(m[1].trim());
+  }
+  // Tel Aviv - Yafo → strip Yafo suffix
+  {const m=last.match(RX.telAvivYafo);if(m)return tcase(m[1].trim());}
+
+  // Australian "City [Suburb] STATE 4digits" e.g. "Gladstone Central QLD 4680"
+  {const m=last.match(RX.auState);
+    if(m){
+      let auCity=m[1].trim().replace(/,+$/,'');
+      // Strip trailing state name or suburb qualifier (Central, North, etc.)
+      const auWords=auCity.split(/\s+/);
+      if(auWords.length>=2&&(isProv(auWords[auWords.length-1])||/^(?:central|north|south|east|west|inner|outer|upper|lower|cbd)$/i.test(auWords[auWords.length-1])))
+        auCity=auWords.slice(0,-1).join(' ').trim();
+      if(auCity&&!isProv(auCity)&&!isStreet(auCity))return tcase(auCity);
+    }
+  }
+
+  // "City/STATE" or "City-STATE" (e.g. "Nova Lima/MG")
+  {const m=last.match(/^([A-Za-z][A-Za-z\s]+?)\s*[\/\-]\s*([A-Z]{2})\s*$/);
+    if(m&&!isStreet(m[1])&&!isProv(m[1]))return tcase(m[1].trim());}
+
+  // NZ/generic "City N-6digits\"
+  {{
+  let _czM=last.match(RX.cityZip);
+   if(!_czM)for(const _tok of last.split(',').map(s=>s.trim()).filter(Boolean)){const _m=_tok.match(RX.cityZip);if(_m){_czM=_m;break;}}
+   {const m=_czM;
     if(m){
       const city=m[1].replace(/,+$/,'').trim();
       if(!isStreet(city)&&!isProv(city)){
@@ -499,19 +697,72 @@ function cityFromParts(parts){
             if(inEarlier||inPrevTwice)return tcase(prevLast);
           }
         }
-        return tcase(city);
+        // Strip trailing qualifier (Curitiba - PR → Curitiba) and city number
+        let czCity=city.replace(RX.trailQual,'').trim();
+        {const mn=czCity.match(RX.cityNum);if(mn&&parseInt(mn[czCity.split(' ').length-1])>30)czCity=mn[1].trim();}
+        return tcase(czCity||city);
       }
     }
   }
-  // Korean -si
+  // Xi'an — explicit detection
+  for(const p of parts){if(/xi'?\s*an\b/i.test(p))return "Xi'an";}
+
+  // CHIN_CITIES is module-level (defined above cityFromParts)
+
+  for(const p of parts){
+    for(const city of CHIN_CITIES){
+      // Match city name as a standalone word (at start, after space/comma, or before space/comma/dash)
+      const rx=new RegExp('(?:^|[\\s,])'+city+'(?:[\\s,\\-]|$)','i');
+      if(rx.test(p))return tcase(city);
+    }
+  }
+
+  // "Daito City", "Jinjiang City" — extract word IMMEDIATELY before "City" keyword
+  // For multi-word phrases like "Changhe Economic City", take only last word before City
+  for(const p of parts){
+    const m=p.match(RX.cityKw);
+    if(m){
+      const full=m[1].trim().replace(/,+$/,'');
+      // Take only the last word (avoids "Changhe Economic" from "Changhe Economic City")
+      const words=full.split(/\s+/);
+      const cname=words[words.length-1];
+      if(cname&&!isStreet(cname)&&!isProv(cname)&&cname.length>1)return tcase(cname);
+    }
+  }
+
+  // Korean city special cases — Seoul, Busan, etc. as standalone segment
+  const SKOR_CITIES=new Set(['seoul','busan','incheon','daegu','daejeon','gwangju','suwon','ulsan','sejong']);
+  for(const p of parts){
+    const pt=p.trim().toLowerCase().replace(/,+$/,'');
+    if(SKOR_CITIES.has(pt))return tcase(p.trim().replace(/,+$/,''));
+  }
+  // Korean -si standalone segment (Seongnam-si as own part → Seongnam)
+  for(const p of parts){
+    const pt=p.trim().replace(/,+$/,'').trim();
+    const siM=pt.match(/^([A-Za-z][A-Za-z\s]*?)-si\s*$/i);
+    if(siM)return tcase(siM[1].trim());
+  }
+}
+  // Korean -ro (road prefix = neighbourhood): Hagui-ro → Hagui
+  for(const p of parts){
+    const m=p.match(/([A-Za-z][A-Za-z\s]+?)-ro\b/i);
+    if(m){const cname=m[1].trim();if(!isStreet(cname)&&!isProv(cname)&&cname.length>2)return tcase(cname);}
+  }
+  // Korean -si fallback
   for(const p of parts){const m=p.match(RX.krSi);if(m)return tcase(m[1].trim());}
   // Japanese -shi/-SHI
   for(const p of parts){const m=p.match(RX.jpShi);if(m)return tcase(m[1].trim().split(/[\s,]+/).pop());}
   // Chinese City keyword
   for(let i=parts.length-1;i>=0;i--){const m=parts[i].match(RX.chinC);if(m){const c=m[1].trim().replace(/,+$/,'');if(!isProv(c))return clean(c);}}
   // Standalone last/prev
-  if(last&&!hasDigit(last)&&!isStreet(last)&&last.length<50&&!isProv(last))return clean(last);
-  if(prev&&!hasDigit(prev)&&!isProv(prev)){
+  // First segment = city (no digits, no street, postcode in last) — checked here so postcode rules take priority
+  if(parts.length>=2&&!hasDigit(first)&&!isStreet(first)&&!RX.skipFst.test(first)
+      &&!RX.companyFirst.test(first)
+      &&first.indexOf(',')===-1&&first.length<40&&hasDigit(last)&&!isProv(first)&&!isRD(first))
+    return clean(first);
+
+  if(last&&!hasDigit(last)&&!isStreet(last)&&last.length<50&&!isProv(last)&&!RX.companyFirst.test(last))return clean(last);
+  if(prev&&!hasDigit(prev)&&!isProv(prev)&&!RX.companyFirst.test(prev)){
     // Return last clean comma-token rather than full string (e.g. "thudiyalur post, coimbatore" → "coimbatore")
     const toks=prev.split(',').map(s=>s.trim()).filter(Boolean);
     for(let i=toks.length-1;i>=0;i--){
@@ -526,8 +777,9 @@ function cityFromParts(parts){
     for(let j=commas.length-1;j>=0;j--){
       const c=commas[j];
       if(c&&!hasDigit(c)&&!isStreet(c)&&c.length>2&&c.length<40&&!isProv(c)&&!RX.region.test(c))
-        if(!/^(?:suite|floor|apt|unit|bldg|ste|r-n|obl|liter)\b/i.test(c))return tcase(c);
+        if(!/^(?:suite|floor|apt|unit|bldg|ste|r-n|obl|liter)\b/i.test(c)&&!RX.companyFirst.test(c))return tcase(c);
     }
+  }
   }
   return null;
 }
@@ -535,10 +787,18 @@ function cityFromParts(parts){
 // ── Build output ───────────────────────────────────────────────────────────────
 function buildOut(hdr,processed){
   const out=[...hdr];
+  let injected=0;
   for(const{rec,city}of processed){
     const ls=[...rec.lines];
-    if(city&&rec.i9!==-1&&rec.i16!==-1)ls.splice(rec.i9+1,0,'0006 : '+city);
+    if(city&&rec.i9!==-1&&rec.i16!==-1){ls.splice(rec.i9+1,0,'0006 : '+city);injected++;}
     out.push(...ls);
+  }
+  // Update 9015 global line counter if present (scans last few lines)
+  if(injected>0){
+    for(let i=out.length-1;i>=Math.max(0,out.length-10);i--){
+      const m=out[i].match(/^(9015 : )(\d+)(\s*)$/);
+      if(m){out[i]=m[1]+(parseInt(m[2])+injected)+m[3];break;}
+    }
   }
   return out.join('\n');
 }
